@@ -2,108 +2,69 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>スマホ利用記録</title>
   <style>
     body {
-      font-family: sans-serif;
-      padding: 20px;
-      background-color: #f5f5f5;
+      font-family: Arial, sans-serif;
+      padding: 16px;
     }
 
     h2 {
       text-align: center;
     }
 
-    p {
-      text-align: center;
-      font-size: 18px;
-      margin-bottom: 10px;
-    }
-
-    /* 横並びボタン用コンテナ */
-    .button-row {
-      display: flex;
-      flex-wrap: wrap;           /* 画面幅が狭いと折り返す */
-      justify-content: center;   /* 中央揃え */
-      gap: 10px;                 /* ボタン間の隙間 */
-      margin-bottom: 20px;
-    }
-
-    /* ボタン共通スタイル */
     button {
-      font-size: 20px;
-      padding: 15px;
-      flex: 1 1 100px;           /* 最小幅100pxで余白を埋める */
-      max-width: 200px;          /* 最大幅 */
-      border-radius: 10px;
+      font-size: 18px;          /* 文字を大きく */
+      padding: 12px 24px;       /* ボタンの面積を大きく */
+      margin: 8px 0;            /* ボタン間の余白 */
+      border-radius: 8px;       /* 角丸 */
       border: none;
       background-color: #4CAF50;
       color: white;
       cursor: pointer;
-      transition: background-color 0.3s;
+      width: 100%;              /* 幅いっぱいに */
+      max-width: 300px;         /* 最大幅を設定 */
+      display: block;           /* ブロックにして縦に並べる */
     }
 
     button:hover {
       background-color: #45a049;
     }
 
-    /* 履歴テーブルは横幅に合わせる */
     table {
       width: 100%;
-      max-width: 600px;
       border-collapse: collapse;
-      margin: 20px auto 0 auto;
-      background-color: white;
+      margin-top: 16px;
     }
 
     th, td {
       padding: 8px;
       text-align: center;
-      border: 1px solid #ccc;
+      border: 1px solid #ddd;
     }
 
-    #rate {
-      text-align: center;
-      font-weight: bold;
-      margin-top: 10px;
-    }
-
-    /* 履歴ボタン */
-    #showLogsBtn {
-      display: block;
-      margin: 20px auto;
-      width: 100%;
-      max-width: 300px;
-      font-size: 20px;
-      padding: 15px;
-      border-radius: 10px;
-      background-color: #2196F3;
-      color: white;
-      border: none;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-
-    #showLogsBtn:hover {
-      background-color: #1976d2;
+    @media (min-width: 600px) {
+      button {
+        width: auto; /* PC は幅を自動調整 */
+      }
     }
   </style>
 </head>
-
 <body>
   <h2>スマホ利用記録</h2>
 
   <p>目的を選んでください</p>
-  <div class="button-row">
-    <button onclick="sendLog('SNS')">SNS</button>
-    <button onclick="sendLog('調べ物')">調べ物</button>
-    <button onclick="sendLog('連絡')">連絡</button>
-  </div>
+  <button onclick="sendLog('SNS')">SNS</button>
+  <button onclick="sendLog('調べ物')">調べ物</button>
+  <button onclick="sendLog('連絡')">連絡</button>
 
-  <button id="showLogsBtn" onclick="showLogs()">履歴を見る</button>
+  <hr>
+
+  <button onclick="showLogs()">履歴を見る</button>
   <p id="rate"></p>
 
-  <table border="1">
+  <table>
     <thead>
       <tr>
         <th>日時</th>
@@ -115,14 +76,12 @@
   </table>
 
   <script>
-    // ===== ユーザーID（ブラウザごと） =====
     let userId = localStorage.getItem("userId");
     if (!userId) {
       userId = crypto.randomUUID();
       localStorage.setItem("userId", userId);
     }
 
-    // ===== 日付表示用 =====
     function formatDate(dateString) {
       const d = new Date(dateString);
       const y = d.getFullYear();
@@ -133,7 +92,6 @@
       return `${y}-${m}-${day} ${h}:${min}`;
     }
 
-    // ===== 記録送信 =====
     function sendLog(purpose) {
       fetch("/log", {
         method: "POST",
@@ -148,7 +106,6 @@
       .then(data => alert(data.message));
     }
 
-    // ===== 履歴表示 =====
     function showLogs() {
       fetch(`/logs/${userId}`)
         .then(res => res.json())
@@ -156,7 +113,6 @@
           const table = document.getElementById("logTable");
           table.innerHTML = "";
 
-          // 成功率
           const rateArea = document.getElementById("rate");
           const total = data.length;
           const successCount = data.filter(log => log.success).length;
@@ -165,11 +121,9 @@
             rateArea.textContent = "まだ記録がありません";
           } else {
             const percent = Math.round((successCount / total) * 100);
-            rateArea.textContent =
-              `成功率：${percent}%（${successCount} / ${total}）`;
+            rateArea.textContent = `成功率：${percent}%（${successCount} / ${total}）`;
           }
 
-          // 表描画
           data.forEach(log => {
             const row = document.createElement("tr");
 
