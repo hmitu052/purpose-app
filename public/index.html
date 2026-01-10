@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>スマホ利用記録</title>
+</head>
+
+<body>
+  <h2>スマホ利用記録</h2>
+
+  <p>目的を選んでください</p>
+  <button onclick="sendLog('SNS')">SNS</button>
+  <button onclick="sendLog('調べ物')">調べ物</button>
+  <button onclick="sendLog('連絡')">連絡</button>
+
+  <hr>
+
+  <button onclick="showLogs()">履歴を見る</button>
+  <p id="rate"></p>
+
+  <table border="1">
+    <thead>
+      <tr>
+        <th>日時</th>
+        <th>目的</th>
+        <th>結果</th>
+      </tr>
+    </thead>
+    <tbody id="logTable"></tbody>
+  </table>
+
+  <script>
+    // ===== ユーザーID（ブラウザごと） =====
+    let userId = localStorage.getItem("userId");
+    if (!userId) {
+      userId = crypto.randomUUID();
+      localStorage.setItem("userId", userId);
+    }
+
+    // ===== 日付表示用 =====
+    function formatDate(dateString) {
+      const d = new Date(dateString);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const h = String(d.getHours()).padStart(2, "0");
+      const min = String(d.getMinutes()).padStart(2, "0");
+      return `${y}-${m}-${day} ${h}:${min}`;
+    }
+
+    // ===== 記録送信 =====
+    function sendLog(purpose) {
+      fetch("/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: userId,
+          purpose: purpose,
+          success: confirm("目的通り使えましたか？")
+        })
+      })
+      .then(res => res.json())
+      .then(data => alert(data.message));
+    }
+
+    // ===== 履歴表示 =====
+    function showLogs() {
+      fetch(`/logs/${userId}`)
+        .then(res => res.json())
+        .then(data => {
+          const table = document.getElementById("logTable");
+          table.innerHTML = "";
+
+          // 成功率
+          const rateArea = document.getElementById("rate");
+          const total = data.length;
+          const successCount = data.filter(log => log.success).length;
+
+          if (total === 0) {
+            rateArea.textContent = "まだ記録がありません";
+          } else {
+            const percent = Math.round((successCount / total) * 100);
+            rateArea.textContent =
+              `成功率：${percent}%（${successCount} / ${total}）`;
+          }
+
+          // 表描画
+          data.forEach(log => {
+            const row = document.createElement("tr");
+
+            const dateCell = document.createElement("td");
+            dateCell.textContent = formatDate(log.date);
+
+            const purposeCell = document.createElement("td");
+            purposeCell.textContent = log.purpose;
+
+            const resultCell = document.createElement("td");
+            resultCell.textContent = log.success ? "成功" : "失敗";
+
+            row.appendChild(dateCell);
+            row.appendChild(purposeCell);
+            row.appendChild(resultCell);
+
+            table.appendChild(row);
+          });
+        });
+    }
+  </script>
+</body>
+</html>
