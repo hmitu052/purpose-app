@@ -1,2 +1,4 @@
 node_modules/
 logs.db
+node_modules/
+package-lock.json
