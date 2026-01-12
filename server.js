@@ -1,85 +1,92 @@
 const express = require("express");
-const sqlite3 = require("sqlite3").verbose();
+const { Pool } = require("pg");
 
 const app = express();
-const db = new sqlite3.Database("logs.db");
 
-// ===== DB初期化 =====
-db.serialize(() => {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS logs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      userId TEXT,
-      date TEXT,
-      purpose TEXT,
-      success INTEGER
-    )
-  `);
+/* ===============================
+   PostgreSQL（Supabase）接続
+================================ */
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
-// ===== ミドルウェア =====
+/* ===============================
+   ミドルウェア
+================================ */
 app.use(express.json());
 app.use(express.static("public"));
 
-// ===== 記録追加 =====
+/* ===============================
+   記録追加 API
+================================ */
 const allowedPurposes = ["SNS", "調べ物", "連絡"];
 
-app.post("/log", (req, res) => {
+app.post("/log", async (req, res) => {
   const { userId, purpose, success } = req.body;
 
+  // バリデーション
   if (!userId) {
-    res.status(400).json({ message: "userIdがありません" });
-    return;
+    return res.status(400).json({ message: "userIdがありません" });
   }
 
   if (!allowedPurposes.includes(purpose)) {
-    res.status(400).json({ message: "不正な目的です" });
-    return;
+    return res.status(400).json({ message: "不正な目的です" });
   }
 
-  const date = new Date().toISOString();
+  if (typeof success !== "boolean") {
+    return res.status(400).json({ message: "successが不正です" });
+  }
 
-  db.run(
-    `INSERT INTO logs (userId, date, purpose, success)
-     VALUES (?, ?, ?, ?)`,
-    [userId, date, purpose, success ? 1 : 0],
-    (err) => {
-      if (err) {
-        res.status(500).json({ message: "保存に失敗しました" });
-        return;
-      }
-      res.json({ message: "記録しました" });
-    }
-  );
+  try {
+    await pool.query(
+      `
+      INSERT INTO logs (user_id, purpose, success)
+      VALUES ($1, $2, $3)
+      `,
+      [userId, purpose, success]
+    );
+
+    res.json({ message: "記録しました" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "保存に失敗しました" });
+  }
 });
 
-// ===== ユーザーごとの履歴取得 =====
-app.get("/logs/:userId", (req, res) => {
+/* ===============================
+   履歴取得 API
+================================ */
+app.get("/logs/:userId", async (req, res) => {
   const userId = req.params.userId;
 
-  db.all(
-    `SELECT * FROM logs WHERE userId = ? ORDER BY id DESC`,
-    [userId],
-    (err, rows) => {
-      if (err) {
-        res.status(500).json([]);
-        return;
-      }
+  try {
+    const result = await pool.query(
+      `
+      SELECT user_id AS "userId",
+             created_at AS date,
+             purpose,
+             success
+      FROM logs
+      WHERE user_id = $1
+      ORDER BY id DESC
+      `,
+      [userId]
+    );
 
-      const logs = rows.map(row => ({
-        userId: row.userId,
-        date: row.date,
-        purpose: row.purpose,
-        success: row.success === 1
-      }));
-
-      res.json(logs);
-    }
-  );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json([]);
+  }
 });
 
+/* ===============================
+   サーバ起動
+================================ */
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
