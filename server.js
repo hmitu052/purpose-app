@@ -27,7 +27,7 @@ app.use(express.static("public"));
 })();
 
 // ===== 記録追加 =====
-const allowedPurposes = ["SNS", "調べ物", "連絡"];
+const allowedPurposes = ["SNS", "調べ物", "連絡","休憩"];
 
 app.post("/log", async (req, res) => {
   const { userId, purpose, success } = req.body;
