@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const { Pool } = require("pg");
 
@@ -21,16 +22,17 @@ app.use(express.static("public"));
       userid TEXT,
       date TIMESTAMP,
       purpose TEXT,
-      success BOOLEAN
+      success BOOLEAN,
+      break_minutes INTEGER
     )
   `);
 })();
 
 // ===== 記録追加 =====
-const allowedPurposes = ["SNS", "調べ物", "連絡","休憩"];
+const allowedPurposes = ["SNS", "調べ物", "連絡", "休憩"];
 
 app.post("/log", async (req, res) => {
-  const { userId, purpose, success } = req.body;
+  const { userId, purpose, success, breakMinutes } = req.body;
 
   if (!userId) {
     return res.status(400).json({ message: "userIdがありません" });
@@ -41,10 +43,16 @@ app.post("/log", async (req, res) => {
 
   try {
     await pool.query(
-      `INSERT INTO logs (userid, date, purpose, success)
-       VALUES ($1, NOW(), $2, $3)`,
-      [userId, purpose, success]
+      `INSERT INTO logs (userid, date, purpose, success, break_minutes)
+   VALUES ($1, NOW(), $2, $3, $4)`,
+      [
+        userId,
+        purpose,
+        success,
+        breakMinutes ?? null
+      ]
     );
+
     res.json({ message: "記録しました" });
   } catch (err) {
     console.error(err);

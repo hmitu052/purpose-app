@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,17 +16,17 @@
     }
 
     button {
-      font-size: 18px;          /* 文字を大きく */
-      padding: 12px 24px;       /* ボタンの面積を大きく */
-      margin: 8px 0;            /* ボタン間の余白 */
-      border-radius: 8px;       /* 角丸 */
+      font-size: 18px;
+      padding: 12px 24px;
+      margin: 8px 0;
+      border-radius: 8px;
       border: none;
       background-color: #4CAF50;
       color: white;
       cursor: pointer;
-      width: 100%;              /* 幅いっぱいに */
-      max-width: 300px;         /* 最大幅を設定 */
-      display: block;           /* ブロックにして縦に並べる */
+      width: 100%;
+      max-width: 300px;
+      display: block;
     }
 
     button:hover {
@@ -38,39 +39,76 @@
       margin-top: 16px;
     }
 
-    th, td {
+    th,
+    td {
       padding: 8px;
       text-align: center;
       border: 1px solid #ddd;
     }
 
+    input[type="number"] {
+      padding: 8px;
+      width: 100px;
+      margin-right: 8px;
+    }
+
+    #stats {
+      margin-top: 12px;
+      font-weight: bold;
+      line-height: 1.6;
+    }
+
     @media (min-width: 600px) {
       button {
-        width: auto; /* PC は幅を自動調整 */
+        width: auto;
       }
     }
   </style>
 </head>
+
 <body>
   <h2>スマホ利用記録</h2>
 
-  <p>目的を選んでください</p>
-  <button onclick="sendLog('SNS')">SNS</button>
-  <button onclick="sendLog('調べ物')">調べ物</button>
-  <button onclick="sendLog('連絡')">連絡</button>
-  <button onclick="sendLog('休憩')">休憩</button>
+  <!-- 目的選択 -->
+  <div id="purposeArea">
+    <p>目的を選んでください</p>
+    <button onclick="selectPurpose('SNS')">SNS</button>
+    <button onclick="selectPurpose('調べ物')">調べ物</button>
+    <button onclick="selectPurpose('連絡')">連絡</button>
+    <button onclick="sendBreak()">休憩</button>
+  </div>
 
-  <hr>
+  <!-- 目的確認 -->
+  <div id="confirmArea" style="display:none; margin-top:16px;">
+    <p>目的通り使えましたか？</p>
+    <button onclick="sendResult(true)" style="background:#2196F3;">はい</button>
+    <button onclick="sendResult(false)" style="background:#f44336;">いいえ</button>
+    <button onclick="cancelSelection()" style="background:#9e9e9e;">キャンセル</button>
+  </div>
 
-  <button onclick="showLogs()">履歴を見る</button>
-  <p id="rate"></p>
+  <!-- 休憩入力 -->
+  <div id="breakArea" style="display:none; margin-top:16px;">
+    <p>休憩時間を入力してください（分）:</p>
+    <input type="number" id="breakInput" min="1">
+    <button onclick="submitBreak()" style="background:#FF9800; color:white;">送信</button>
+    <button onclick="cancelBreak()" style="background:#9e9e9e; color:white;">キャンセル</button>
+  </div>
 
-  <table>
+  <!-- 履歴表示 -->
+  <button id="showLogsBtn" onclick="showLogs()">履歴を見る</button>
+
+  <div id="stats">
+    <p id="rate"></p>
+    <p id="totalBreak"></p>
+  </div>
+
+  <table id="logTableContainer">
     <thead>
       <tr>
         <th>日時</th>
         <th>目的</th>
         <th>結果</th>
+        <th>休憩時間</th>
       </tr>
     </thead>
     <tbody id="logTable"></tbody>
@@ -93,18 +131,100 @@
       return `${y}-${m}-${day} ${h}:${min}`;
     }
 
-    function sendLog(purpose) {
+    let selectedPurpose = null;
+
+    function selectPurpose(purpose) {
+      selectedPurpose = purpose;
+      document.getElementById("purposeArea").style.display = "none";
+      document.getElementById("confirmArea").style.display = "block";
+
+      // 履歴非表示
+      document.getElementById("showLogsBtn").style.display = "none";
+      document.getElementById("logTableContainer").style.display = "none";
+      document.getElementById("stats").style.display = "none";
+    }
+
+    function sendResult(success) {
+      if (!selectedPurpose) return;
+
       fetch("/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: userId,
-          purpose: purpose,
-          success: confirm("目的通り使えましたか？")
+          purpose: selectedPurpose,
+          success: success
         })
       })
-      .then(res => res.json())
-      .then(data => alert(data.message));
+        .then(res => res.json())
+        .then(data => {
+          alert(data.message);
+          resetSelection();
+        });
+    }
+
+    function cancelSelection() {
+      resetSelection();
+    }
+
+    function sendBreak() {
+      document.getElementById("breakArea").style.display = "block";
+      document.getElementById("purposeArea").style.display = "none";
+
+      // 履歴非表示
+      document.getElementById("showLogsBtn").style.display = "none";
+      document.getElementById("logTableContainer").style.display = "none";
+      document.getElementById("stats").style.display = "none";
+    }
+
+    function submitBreak() {
+      const minutes = document.getElementById("breakInput").value;
+
+      if (!minutes || isNaN(minutes) || minutes <= 0) {
+        alert("正しい数字を入力してください");
+        return;
+      }
+      // 20分以上なら失敗、未満なら成功
+      const success = Number(minutes) < 20;
+
+      fetch("/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: userId,
+          purpose: "休憩",
+          breakMinutes: Number(minutes),
+          success: success
+        })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (!success) {
+            alert(`休憩時間が20分以上のため「失敗」と記録されました`);
+          } else {
+            alert(data.message);
+          }
+
+          document.getElementById("breakArea").style.display = "none";
+          document.getElementById("purposeArea").style.display = "block";
+          document.getElementById("breakInput").value = "";
+
+          document.getElementById("showLogsBtn").style.display = "block";
+        });
+    }
+
+    function cancelBreak() {
+      document.getElementById("breakArea").style.display = "none";
+      document.getElementById("purposeArea").style.display = "block";
+      document.getElementById("breakInput").value = "";
+      document.getElementById("showLogsBtn").style.display = "block";
+    }
+
+    function resetSelection() {
+      selectedPurpose = null;
+      document.getElementById("confirmArea").style.display = "none";
+      document.getElementById("purposeArea").style.display = "block";
+      document.getElementById("showLogsBtn").style.display = "block";
     }
 
     function showLogs() {
@@ -115,11 +235,15 @@
           table.innerHTML = "";
 
           const rateArea = document.getElementById("rate");
+          const totalBreakArea = document.getElementById("totalBreak");
+          let totalBreakMinutes = 0;
+
           const total = data.length;
           const successCount = data.filter(log => log.success).length;
 
           if (total === 0) {
             rateArea.textContent = "まだ記録がありません";
+            totalBreakArea.textContent = "";
           } else {
             const percent = Math.round((successCount / total) * 100);
             rateArea.textContent = `成功率：${percent}%（${successCount} / ${total}）`;
@@ -137,14 +261,30 @@
             const resultCell = document.createElement("td");
             resultCell.textContent = log.success ? "成功" : "失敗";
 
+            const breakCell = document.createElement("td");
+            breakCell.textContent = log.break_minutes
+              ? `${log.break_minutes}分`
+              : "-";
+
+            if (log.break_minutes) totalBreakMinutes += log.break_minutes;
+
             row.appendChild(dateCell);
             row.appendChild(purposeCell);
             row.appendChild(resultCell);
+            row.appendChild(breakCell);
 
             table.appendChild(row);
           });
+
+          totalBreakArea.textContent = totalBreakMinutes
+            ? `合計休憩時間：${totalBreakMinutes}分`
+            : "";
+
+          document.getElementById("logTableContainer").style.display = "table";
+          document.getElementById("stats").style.display = "block";
         });
     }
   </script>
 </body>
+
 </html>
